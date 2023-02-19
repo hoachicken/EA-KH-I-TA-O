@@ -1,0 +1,260 @@
+void OnTick()
+{
+    double lots = 0.01; // khối lượng giao dịch 0.01 lot
+    double sl = 1.25; // stop loss
+    double tp = 1.5; // take profit
+    double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_ASK); // giá hiện tại
+
+    // tính toán giá trị đường Zigzag
+    int indicatorHandle = iCustom(_Symbol, PERIOD_CURRENT, "ZigZag", 12, 5, 3, 0, true);
+    double zigzagValue = iCustom(_Symbol, PERIOD_CURRENT, "ZigZag", 12, 5, 3, 0, true, 1);
+    double previousZigzagValue = iCustom(_Symbol, PERIOD_CURRENT, "ZigZag", 12, 5, 3, 0, true, 2);
+
+    if (zigzagValue < previousZigzagValue) // chuyển đổi từ uptrend sang downtrend
+    {
+        double entryPrice = NormalizeDouble(currentPrice - Point, _Digits); // giá nhập
+        double stopLoss = NormalizeDouble(entryPrice + (sl * Point), _Digits); // tính toán stop loss
+        double takeProfit = NormalizeDouble(entryPrice - (tp * Point), _Digits); // tính toán take profit
+        int ticket = OrderSend(_Symbol, OP_SELL, lots, entryPrice, 5, stopLoss, takeProfit, "sell", MagicNumber, 0, Red);
+        if (ticket > 0)
+        {
+            Print("OrderSend sell successful. Ticket = ", ticket);
+        }
+        else
+        {
+            Print("OrderSend sell failed. Error code = ", GetLastError());
+        }
+    }
+    else if (zigzagValue > previousZigzagValue) // chuyển đổi từ downtrend sang uptrend
+    {
+        double entryPrice = NormalizeDouble(currentPrice + Point, _Digits); // giá nhập
+        double stopLoss = NormalizeDouble(entryPrice - (sl * Point), _Digits); // tính toán stop loss
+        double takeProfit = NormalizeDouble(entryPrice + (tp * Point), _Digits); // tính toán take profit
+        int ticket = OrderSend(_Symbol, OP_BUY, lots, entryPrice, 5, stopLoss, takeProfit, "buy", MagicNumber, 0, Green);
+        if (ticket > 0)
+        {
+            Print("OrderSend buy successful. Ticket = ", ticket);
+        }
+        else
+        {
+            Print("OrderSend buy failed. Error code = ", GetLastError());
+        }
+    }
+}
+void OnTick()
+{
+   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+
+   // Kiểm tra nếu giá trị của ZigZag có sự thay đổi
+   static double zz_value = 0;
+   double current_zz_value = iCustom(NULL, 0, "ZigZag", 12, 5, 3, 0, 1);
+   if(current_zz_value != zz_value) {
+      zz_value = current_zz_value;
+      Print("ZigZag: ", zz_value);
+   }
+
+   // Kiểm tra vị trí hiện tại của giá so với ZigZag
+   static int zz_pos = 0;
+   double current_zz_pos = iCustom(NULL, 0, "ZigZag", 12, 5, 3, 0, 2);
+   if(current_zz_pos != zz_pos) {
+      zz_pos = current_zz_pos;
+      Print("ZigZag position: ", zz_pos);
+   }
+
+   // Đặt lệnh mua khi giá chạm đường ZigZag
+   if(zz_pos == 1 && ask <= zz_value) {
+      int ticket = OrderSend(_Symbol, OP_BUY, 0.01, ask, 3, 0, 0, "ZigZag Buy", 0, 0, Green);
+      if(ticket > 0) {
+         if(OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES)) {
+            double stop_loss = zz_value - (zz_value * 0.01);
+            double take_profit = zz_value + (zz_value * 0.02);
+            bool sl = OrderModify(ticket, 0, stop_loss, take_profit, 0);
+            if(sl) {
+               Print("Order modified successfully.");
+            }
+            else {
+               Print("Order modification failed.");
+            }
+         }
+         else {
+            Print("Error selecting order.");
+         }
+      }
+      else {
+         Print("Error sending order.");
+      }
+   }
+
+   // Đặt lệnh bán khi giá chạm đường ZigZag
+   if(zz_pos == 2 && bid >= zz_value) {
+      int ticket = OrderSend(_Symbol, OP_SELL, 0.01, bid, 3, 0, 0, "ZigZag Sell", 0, 0, Red);
+      if(ticket > 0) {
+         if(OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES)) {
+            double stop_loss = zz_value + (zz_value * 0.01);
+            double take_profit = zz_value - (zz_value * 0.02);
+            bool sl = OrderModify(ticket, 0, stop_loss, take_profit, 0);
+            if(sl) {
+               Print("Order modified successfully.");
+            }
+            else {
+               Print("Order modification failed.");
+            }
+         }
+         else {
+            Print("Error selecting order.");
+         }
+      }
+      else {
+         Print("Error sending order.");
+      }
+   }
+}
+void OnTick()
+{
+    double lotSize = 0.01; // Kích thước lot
+    double stopLoss = 20; // Khoảng cách stop loss tính bằng pip
+    double takeProfit = 40; // Khoảng cách take profit tính bằng pip
+
+    double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_ASK); // Giá thị trường hiện tại
+    double zigzagHigh = iCustom(_Symbol, 0, "ZigZag", 12, 5, 3, 0, 1); // Đường ZigZag High
+    double zigzagLow = iCustom(_Symbol, 0, "ZigZag", 12, 5, 3, 0, 2); // Đường ZigZag Low
+
+    if (OrdersTotal() == 0) // Nếu không có lệnh mở
+    {
+        if (currentPrice >= zigzagHigh) // Nếu giá vượt đường ZigZag High
+        {
+            int ticket = OrderSend(_Symbol, OP_BUY, lotSize, currentPrice, 3, currentPrice - stopLoss * Point, currentPrice + takeProfit * Point, "ZigZag Trading", 0, 0, Green);
+            if (ticket < 0) // Nếu lệnh không được mở
+            {
+                Print("Không thể mở lệnh mua! Mã lỗi: ", GetLastError());
+            }
+        }
+        else if (currentPrice <= zigzagLow) // Nếu giá xuống dưới đường ZigZag Low
+        {
+            int ticket = OrderSend(_Symbol, OP_SELL, lotSize, currentPrice, 3, currentPrice + stopLoss * Point, currentPrice - takeProfit * Point, "ZigZag Trading", 0, 0, Red);
+            if (ticket < 0) // Nếu lệnh không được mở
+            {
+                Print("Không thể mở lệnh bán! Mã lỗi: ", GetLastError());
+            }
+        }
+    }
+}
+void OnTick()
+{
+    double lastHigh, lastLow;
+    static bool isBuy = false;
+    static bool isSell = false;
+    int counted_bars = IndicatorCounted();
+    double zzBuffer[];
+    ArraySetAsSeries(zzBuffer, true);
+
+    // Nếu số lượng thanh chưa được tính toán đủ bởi ZigZag
+    if (counted_bars < 0)
+    {
+        return;
+    }
+
+    // Lấy giá trị ZigZag tại thanh hiện tại
+    int zzCount = iCustom(_Symbol, PERIOD_CURRENT, "ZigZag", 0, 0);
+    if (zzCount < 0)
+    {
+        Print("Không thể tính toán ZigZag: ", GetLastError());
+        return;
+    }
+
+    // Lấy giá trị ZigZag tại thanh trước đó
+    int prevZzCount = iCustom(_Symbol, PERIOD_CURRENT, "ZigZag", 0, 1);
+    if (prevZzCount < 0)
+    {
+        Print("Không thể tính toán ZigZag: ", GetLastError());
+        return;
+    }
+
+    // Lấy giá trị của cản trên và cản dưới từ ZigZag
+    if (zzCount != prevZzCount)
+    {
+        lastHigh = iCustom(_Symbol, PERIOD_CURRENT, "ZigZag", 0, 0, MODE_HIGH, zzBuffer);
+        lastLow = iCustom(_Symbol, PERIOD_CURRENT, "ZigZag", 0, 0, MODE_LOW, zzBuffer);
+    }
+    else
+    {
+        lastHigh = iCustom(_Symbol, PERIOD_CURRENT, "ZigZag", 0, 1, MODE_HIGH, zzBuffer);
+        lastLow = iCustom(_Symbol, PERIOD_CURRENT, "ZigZag", 0, 1, MODE_LOW, zzBuffer);
+    }
+
+    // Lấy giá thị trường hiện tại
+    double currentPrice = MarketInfo(_Symbol, MODE_BID);
+
+    // Kiểm tra nếu chưa có vị trí giao dịch mở
+    if (!PositionSelect(_Symbol))
+    {
+        // Nếu giá thị trường đang ở dưới cản trên của ZigZag và chưa có vị trí mua
+        if (currentPrice >= lastHigh && !isBuy)
+        {
+            // Đặt lệnh mua 1 lot với mức stop loss dựa trên cản dưới của ZigZag và take profit bằng độ lớn của ZigZag
+            double stopLoss = lastLow - 10 * _Point;
+            double takeProfit = currentPrice + (lastHigh - lastLow);
+            int ticket = OrderSend(_Symbol, OP_BUY, 1.0, currentPrice, 10, stopLoss, takeProfit, "MyOrder", 0, 0, Green);
+            if (ticket <= 0)
+            {
+                Print("Không thể đặt lệnh mua: ", GetLastError());
+                return;
+            }
+            isBuy = true;
+        }
+void OnTick()
+{
+    // Kiểm tra nếu chưa có vị trí giao dịch mở
+    if(!PositionSelect(_Symbol))
+    {
+        // Mở vị trí mua 1 lot với giá thị trường hiện tại
+        double price = MarketInfo(_Symbol, MODE_ASK);
+        int ticket = OrderSend(_Symbol, OP_BUY, 1.0, price, 10, price - 20 * _Point, price + 30 * _Point, "MyOrder", 0, 0, Green);
+        if(ticket <= 0)
+        {
+            Print("Không thể đặt lệnh mua: ", GetLastError());
+            return;
+        }
+    }
+}
+void OnDeinit(const int reason)
+{
+    // Lưu lại các cài đặt đã chỉnh sửa
+    if(IsTesting())
+    {
+        // Lưu lại các cài đặt cho bài kiểm tra
+        GlobalVariableSet("LotSize", LotSize);
+        GlobalVariableSet("StopLoss", StopLoss);
+        GlobalVariableSet("TakeProfit", TakeProfit);
+    }
+    else
+    {
+        // Lưu lại các cài đặt cho phiên giao dịch thực tế
+        WriteDouble("LotSize", LotSize);
+        WriteDouble("StopLoss", StopLoss);
+        WriteDouble("TakeProfit", TakeProfit);
+    }
+    
+    // In ra thông báo khi EA bị xóa hoặc bị gỡ bỏ
+    Print("Chiken Boy EA đã bị xóa hoặc bị gỡ bỏ.");
+}
+int OnInit()
+{
+    // Thiết lập các tham số cho EA
+    LotSize = 0.01;
+    StopLoss = 50;
+    TakeProfit = 100;
+    
+    // Kiểm tra điều kiện trước khi khởi tạo EA
+    if(!IsTradeAllowed())
+    {
+        Print("Không thể giao dịch. Vui lòng kiểm tra cài đặt của tài khoản.");
+        return INIT_FAILED;
+    }
+    
+    // In ra thông báo khi EA được khởi tạo thành công
+    Print("Chiken Boy EA đã được khởi tạo thành công!");
+    
+    return INIT_SUCCEEDED;
+}
